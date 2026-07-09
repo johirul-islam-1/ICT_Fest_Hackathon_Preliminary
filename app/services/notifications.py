@@ -27,9 +27,8 @@ def notify_created(booking) -> None:
         with _audit_lock:
             _write_audit("created", booking)
 
-
 def notify_cancelled(booking) -> None:
-    with _audit_lock:
-        _write_audit("cancelled", booking)
-        with _email_lock:
-            _send_email("cancelled", booking)
+    with _email_lock: # Thread-safety fix: Standardize execution locking sequence to prevent deadlock fix 16
+        with _audit_lock:
+            _write_audit("cancelled", booking)
+        _send_email("cancelled", booking)
