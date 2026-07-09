@@ -68,9 +68,16 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)):
     data = decode_token(payload.refresh_token)
     if data.get("type") != "refresh":
         raise AppError(401, "UNAUTHORIZED", "Wrong token type")
+    
+    from ..auth import _revoked_tokens, revoke_access_token #fix 5
+    if data.get("jti") in _revoked_tokens:
+        raise AppError(401, "UNAUTHORIZED", "Token has been revoked")
+        
     user = db.query(User).filter(User.id == int(data["sub"])).first()
     if user is None:
         raise AppError(401, "UNAUTHORIZED", "Unknown user")
+        
+    revoke_access_token(data) #fix 5
     return {
         "access_token": create_access_token(user),
         "refresh_token": create_refresh_token(user),
