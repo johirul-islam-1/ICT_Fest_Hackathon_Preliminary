@@ -20,29 +20,51 @@ from ..schemas import LoginRequest, RefreshRequest, RegisterRequest
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/register", status_code=201) # fix4
+@router.post("/register", status_code=201)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     org = db.query(Organization).filter(Organization.name == payload.org_name).first()
     role = "admin" if org is None else "member"
     if org is None:
-        org = Organization(name=payload.org_name)
-        db.add(org)
-        db.commit()
-        db.refresh(org)
+        try:
+            org = Organization(name=payload.org_name)
+            db.add(org)
+            db.commit()
+            db.refresh(org)
+        except IntegrityError:
+            db.rollback()
+            org = db.query(Organization).filter(Organization.name == payload.org_name).first()
 
     existing = (
         db.query(User)
         .filter(User.org_id == org.id, User.username == payload.username)
         .first()
     )
+    # Minimal Fix: Raise 409 error instead of returning existing user details
     if existing is not None:
-        return {
-            "user_id": existing.id,
-            "org_id": org.id,
-            "username": existing.username,
-            "role": existing.role,
-        }
+        raise AppError(409, "USERNAME_TAKEN", "Username already taken")
 
+    user = User(
+        org_id=org.id,
+        username=payload.username,
+        hashed_password=hash_password(payload.password),
+        role=role,
+    )
+    db.add(user)
+    
+    # Minimal Fix: Wrap commit in try/except to handle concurrent registration attempts safely
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise AppError(409, "USERNAME_TAKEN", "Username already taken")
+        
+    db.refresh(user)
+    return {
+        "user_id": user.id,
+        "org_id": org.id,
+        "username": user.username,
+        "role": user.role,
+    }
 
 @router.post("/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
