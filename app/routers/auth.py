@@ -1,6 +1,7 @@
 """Authentication endpoints: register, login, refresh, logout."""
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError # fix 4
 
 from ..auth import (
     create_access_token,
@@ -19,7 +20,7 @@ from ..schemas import LoginRequest, RefreshRequest, RegisterRequest
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/register", status_code=201)
+@router.post("/register", status_code=201) # fix4
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     org = db.query(Organization).filter(Organization.name == payload.org_name).first()
     role = "admin" if org is None else "member"
@@ -41,22 +42,6 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
             "username": existing.username,
             "role": existing.role,
         }
-
-    user = User(
-        org_id=org.id,
-        username=payload.username,
-        hashed_password=hash_password(payload.password),
-        role=role,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return {
-        "user_id": user.id,
-        "org_id": org.id,
-        "username": user.username,
-        "role": user.role,
-    }
 
 
 @router.post("/login")
