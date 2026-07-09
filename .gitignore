@@ -4,3 +4,6 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+tests/test_100_hackathon_style_contract.py
+tests/test_api_contract.py
+tests/test_extreme.py

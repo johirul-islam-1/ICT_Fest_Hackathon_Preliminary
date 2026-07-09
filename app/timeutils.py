@@ -16,4 +16,4 @@ def parse_input_datetime(value: str) -> datetime:
 
 def iso_utc(dt: datetime) -> str:
     """Render a stored (naive UTC) datetime with an explicit UTC designator."""
-    return dt.replace(tzinfo=timezone.utc).isoformat()
+    return dt.replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z")
